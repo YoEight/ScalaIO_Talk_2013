@@ -17,29 +17,133 @@ object Parser {
   case class AToken(v: Token) extends Cell
 
   sealed trait LalrOp[+A]
-  case class Shift[A](v: A) extends LalrOp[A]
-  case class Reduce[A](prod: Production, v: A) extends LalrOp[A]
-  case class LookAhead[A](pred: Token => Boolean, k: Boolean => A) extends LalrOp[A]
-  case class Failure(k: Token => String) extends LalrOp[Nothing]
+  case class Shift[A](k: Token => A) extends LalrOp[A]
+  case class LookAhead[A](k: Token => A) extends LalrOp[A]
+  case class Failure(e: String) extends LalrOp[Nothing]
 
   implicit val lalrFunctor = new Functor[LalrOp] {
     def map[A, B](fa: LalrOp[A])(f: A => B): LalrOp[B] = fa match {
-      case Shift(v)        => Shift(f(v))
-      case Reduce(p, v)    => Reduce(p, f(v))
-      case LookAhead(p, k) => LookAhead(p, f compose k)
-      case Failure(k)      => Failure(k)
+      case Shift(k)     => Shift(f compose k)
+      case LookAhead(k) => LookAhead(f compose k)
+      case Failure(e)   => Failure(e)
     }
   }
 
-  def shift: LALR[Unit] =
-    Suspend[LalrOp, Unit](Shift(Return()))
+  implicit class LalrOps[A](self: LALR[A]) {
+    def >>[B](n: LALR[B]): LALR[B] =
+      self.flatMap(_ => n)
 
-  def reduce(prod: Production): LALR[Unit] =
-    Suspend[LalrOp, Unit](Reduce(prod, Return()))
+    def reduceBy(ast: Ast): LALR[Ast] =
+      self.map(_ => ast)
 
-  def lookAhead(pred: Token => Boolean): LALR[Boolean] =
-    Suspend[LalrOp, Boolean](LookAhead(pred, Return(_)))
+    def unit: LALR[Unit] =
+      self.map(_ => ())
+  }
 
-  def failure[A](k: Token => String): LALR[A] =
-    Suspend[LalrOp, A](Failure(k))
+  def shift: LALR[Token] =
+    Suspend[LalrOp, Token](Shift(Return(_)))
+
+  def discard: LALR[Unit] =
+    shift.unit
+
+  def lookAhead: LALR[Token] =
+    Suspend[LalrOp, Token](LookAhead(Return(_)))
+
+  def failure[A](e: String): LALR[A] =
+    Suspend[LalrOp, A](Failure(e))
+
+  def reduce(ast: Ast): LALR[Ast] =
+    Return(ast)
+
+  object When {
+    def apply[A](f: Token => LALR[A]): LALR[A] =
+      lookAhead.flatMap(f)
+  }
+
+  object Factor {
+    def unapply(ch: Char): Option[(Ast, Ast) => Ast] = ch match {
+      case '*' => Some(Ast.mul(_, _))
+      case '/' => Some(Ast.div(_, _))
+      case _   => None
+    }
+  }
+
+  object Term {
+    def unapply(ch: Char): Option[(Ast, Ast) => Ast] = ch match {
+      case '+' => Some(Ast.add(_, _))
+      case '-' => Some(Ast.sub(_, _))
+      case _   => None
+    }
+  }
+
+  def parse: LALR[Ast] = {
+    def end: LALR[Unit] =
+      When[Unit] {
+        case EOF => discard
+        case _   => failure("This is not supposed to happen")
+      }
+
+    for {
+      e <- expr
+      _ <- end
+    } yield e
+  }
+
+  def expr: LALR[Ast] =
+    add
+
+  def add: LALR[Ast] = {
+    def loop(l: Ast): LALR[Ast] =
+      When[Ast] {
+        case Op(Term(make)) =>
+          for {
+            _ <- shift
+            r <- add
+          } yield make(l, r)
+        case _ => reduce(l)
+      }
+
+    for {
+      l <- mul
+      r <- loop(l)
+    } yield r
+  }
+
+  def mul: LALR[Ast] = {
+    def loop(l: Ast): LALR[Ast] =
+      When[Ast] {
+        case Op(Factor(make)) =>
+          for {
+            _ <- shift
+            r <- mul
+          } yield make(l, r)
+        case _ => reduce(l)
+      }
+
+    for {
+      l <- lit
+      r <- loop(l)
+    } yield r
+  }
+
+  def lit: LALR[Ast] =
+    When[Ast] {
+      case Lit(n)  => shift.reduceBy(Ast.number(n.toDouble))
+      case LParens => parensExpr
+      case x       => failure(s"Unexpected token $x")
+    }
+
+  def parensExpr: LALR[Ast] = {
+    def go =
+      When[Unit] {
+        case RParens => discard
+        case x       => failure(s"Unexpected token $x")
+      }
+
+    for {
+      _ <- discard
+      e <- expr
+      _ <- go
+    } yield e
+  }
 }

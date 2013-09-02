@@ -20,3 +20,20 @@ object AstOp {
     }
   }
 }
+
+object Ast {
+  def number(d: Double): Mu[AstOp] =
+    Mu[AstOp](Number(d))
+
+  def mul(l: Mu[AstOp], r: Mu[AstOp]): Mu[AstOp] =
+    Mu[AstOp](Mul(l, r))
+
+  def div(l: Mu[AstOp], r: Mu[AstOp]): Mu[AstOp] =
+    Mu[AstOp](Div(l, r))
+
+  def add(l: Mu[AstOp], r: Mu[AstOp]): Mu[AstOp] =
+    Mu[AstOp](Add(l, r))
+
+  def sub(l: Mu[AstOp], r: Mu[AstOp]): Mu[AstOp] =
+    Mu[AstOp](Sub(l, r))
+}
