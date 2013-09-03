@@ -109,8 +109,9 @@ object Parser {
   def parse: LALR[Ast] = {
     def end: LALR[Unit] =
       When[Unit] {
-        case EOF => discard
-        case _   => failure("This is not supposed to happen")
+        case EOF      => discard
+        case Error(e) => failure(e)
+        case _        => failure("This is not supposed to happen")
       }
 
     for {

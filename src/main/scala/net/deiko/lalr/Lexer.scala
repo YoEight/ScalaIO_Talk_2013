@@ -39,7 +39,7 @@ object Lexer {
       case '0' if acc.isEmpty    => receive1[Char, Token](startByZero, emit(Lit("0")))
       case _   if ch.isDigit     => receive1[Char, Token](makeLit(acc + ch, _), emit(Lit(acc + ch)) ++ emit(EOF))
       case _   if ch.isSpaceChar => emit(Lit(acc)) ++ receive1[Char, Token](step, emit(EOF))
-      case _                     => emit(unexpected(ch, Some("a digit")))
+      case _                     => emit(Lit(acc)) ++ step(ch)
     }
   }
 
