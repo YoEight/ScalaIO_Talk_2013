@@ -2,6 +2,7 @@ package net.deiko.lalr
 
 import scalaz.stream._
 import Process._
+import scalaz.{\/, -\/, \/-}
 import scalaz.Functor
 import scalaz.Free
 import Free._
@@ -27,6 +28,35 @@ object Parser {
       case LookAhead(k) => LookAhead(f compose k)
       case Failure(e)   => Failure(e)
     }
+  }
+
+  def parser: Process1[Token, String \/ Ast] =
+    makeParser(parse)
+
+  def recv(f: Token => Process1[Token, String \/ Ast]): Process1[Token, String \/ Ast] =
+    receive1[Token, String \/ Ast](f, emit(-\/("Imcomplete parse tree")))
+
+  def makeParser(tree: LALR[Ast]): Process1[Token, String \/ Ast] = {
+    def go(step: LALR[Ast], ahead: Option[Token]): Process1[Token, String \/ Ast] = {
+      def shifting(k: Token => LALR[Ast])(t: Token): Process1[Token, String \/ Ast] =
+        go(k(t), None)
+
+      def looking(k: Token => LALR[Ast])(t: Token): Process1[Token, String \/ Ast] =
+        go(k(t), Some(t))
+
+      def interpret(instr: LalrOp[LALR[Ast]]): Process1[Token, String \/ Ast] = instr match {
+        case Shift(k)     => ahead.fold(recv(shifting(k)))(shifting(k))
+        case LookAhead(k) => ahead.fold(recv(looking(k)))(looking(k))
+        case Failure(e)   => emit(-\/(e))
+      }
+
+      def finish(ast: Ast): Process1[Token, String \/ Ast] =
+        emit(\/-(ast))
+
+      step.resume.fold(interpret, finish)
+    }
+
+    go(tree, None)
   }
 
   implicit class LalrOps[A](self: LALR[A]) {
