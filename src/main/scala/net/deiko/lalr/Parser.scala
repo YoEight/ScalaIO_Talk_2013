@@ -8,9 +8,6 @@ import scalaz.Free
 import Free._
 
 object Parser {
-  type Ast = Mu[AstOp]
-  type LALR[A] = Free[LalrOp, A]
-
   sealed trait LalrOp[+A]
   case class Shift[A](k: Token => A) extends LalrOp[A]
   case class LookAhead[A](k: Token => A) extends LalrOp[A]

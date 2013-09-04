@@ -6,9 +6,9 @@ import scalaz.stream._
 import Process._
 
 object Calculator {
-  val evaluator: Channel[Task, String \/ Mu[AstOp], String \/ Double] = {
-    def go(input: String \/ Mu[AstOp]): Task[String \/ Double] = {
-      def step(ast: Mu[AstOp]): Task[Double] =
+  val evaluator: Channel[Task, String \/ Ast, String \/ Double] = {
+    def go(input: String \/ Ast): Task[String \/ Double] = {
+      def step(ast: Ast): Task[Double] =
         Task.now {
           ast.fold[Double] {
             case Number(n) => n
@@ -22,15 +22,6 @@ object Calculator {
       input.traverse(step)
     }
 
-    await(Task.now[(String \/ Mu[AstOp]) => Task[String \/ Double]](go))(emit).repeat
-  }
-
-  def main(args: Array[String]) {
-    import scalaz.std.string._
-    import scalaz.syntax.foldable._
-    import scalaz.concurrent.Task
-
-    val source: Process[Task, Char] = emitAll("1 + 2 * (3 + 5) + 1")
-    println((source |> Lexer.lexer |> Parser.parser).through(evaluator).collect.run)
+    await(Task.now[(String \/ Ast) => Task[String \/ Double]](go))(emit).repeat
   }
 }
