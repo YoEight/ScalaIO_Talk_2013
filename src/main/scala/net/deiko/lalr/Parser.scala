@@ -8,14 +8,8 @@ import scalaz.Free
 import Free._
 
 object Parser {
-  type Stack = List[Cell]
-  type Production = Stack => (Cell, Stack)
   type Ast = Mu[AstOp]
   type LALR[A] = Free[LalrOp, A]
-
-  sealed trait Cell
-  case class AnAst(v: Ast) extends Cell
-  case class AToken(v: Token) extends Cell
 
   sealed trait LalrOp[+A]
   case class Shift[A](k: Token => A) extends LalrOp[A]
@@ -59,22 +53,11 @@ object Parser {
     go(tree, None)
   }
 
-  implicit class LalrOps[A](self: LALR[A]) {
-    def >>[B](n: LALR[B]): LALR[B] =
-      self.flatMap(_ => n)
-
-    def reduceBy(ast: Ast): LALR[Ast] =
-      self.map(_ => ast)
-
-    def unit: LALR[Unit] =
-      self.map(_ => ())
-  }
-
   def shift: LALR[Token] =
     Suspend[LalrOp, Token](Shift(Return(_)))
 
   def discard: LALR[Unit] =
-    shift.unit
+    shift.map(_ => ())
 
   def lookAhead: LALR[Token] =
     Suspend[LalrOp, Token](LookAhead(Return(_)))
@@ -123,43 +106,21 @@ object Parser {
   def expr: LALR[Ast] =
     add
 
-  def add: LALR[Ast] = {
-    def loop(l: Ast): LALR[Ast] =
-      When[Ast] {
-        case Op(Term(make)) =>
-          for {
-            _ <- shift
-            r <- add
-          } yield make(l, r)
-        case _ => reduce(l)
-      }
+  def add: LALR[Ast] =
+    looping(mul) {
+      case Op(Term(make)) => Some(make)
+      case _              => None
+    }
 
-    for {
-      l <- mul
-      r <- loop(l)
-    } yield r
-  }
-
-  def mul: LALR[Ast] = {
-    def loop(l: Ast): LALR[Ast] =
-      When[Ast] {
-        case Op(Factor(make)) =>
-          for {
-            _ <- shift
-            r <- mul
-          } yield make(l, r)
-        case _ => reduce(l)
-      }
-
-    for {
-      l <- lit
-      r <- loop(l)
-    } yield r
-  }
+  def mul: LALR[Ast] =
+    looping(lit) {
+      case Op(Factor(make)) => Some(make)
+      case _                => None
+    }
 
   def lit: LALR[Ast] =
     When[Ast] {
-      case Lit(n)  => shift.reduceBy(Ast.number(n.toDouble))
+      case Lit(n)  => shift.flatMap(_ => reduce(Ast.number(n.toDouble)))
       case LParens => parensExpr
       case x       => failure(s"Unexpected token $x")
     }
@@ -176,5 +137,22 @@ object Parser {
       e <- expr
       _ <- go
     } yield e
+  }
+
+  def looping(action: LALR[Ast])(pred: Token => Option[(Ast, Ast) => Ast]): LALR[Ast] = {
+    def go(l: Ast): LALR[Ast] =
+      When[Ast] { token =>
+        pred(token).fold(reduce(l)){ make =>
+          for {
+            _ <- shift
+            r <- looping(action)(pred)
+          } yield make(l, r)
+        }
+      }
+
+    for {
+      l <- action
+      r <- go(l)
+    } yield r
   }
 }

@@ -30,7 +30,7 @@ object Calculator {
     import scalaz.syntax.foldable._
     import scalaz.concurrent.Task
 
-    val source: Process[Task, Char] = emitAll("1 + 2 * 3")
+    val source: Process[Task, Char] = emitAll("1 + 2 * (3 + 5) + 1")
     println((source |> Lexer.lexer |> Parser.parser).through(evaluator).collect.run)
   }
 }
