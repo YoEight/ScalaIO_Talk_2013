@@ -6,7 +6,7 @@ object Example {
     import scalaz.stream.Process
 
     val source: Process[Task, Char] = Process.emitAll("1 + 2 * (3 + 5) + 1")
-    val process = (source |> Lexer.lexer |> Parser.parser).through(Calculator.evaluator)
+    val process = source |> Lexer.lexer |> Parser.parser |> Calculator.evaluator
 
     println(process.collect.run)
   }
