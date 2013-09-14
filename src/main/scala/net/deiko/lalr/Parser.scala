@@ -8,6 +8,10 @@ import scalaz.Free
 import Free._
 
 object Parser {
+  case class ParseError(msg: String) extends Throwable {
+    override def toString = s"ParserError($msg)"
+  }
+
   sealed trait LalrOp[+A]
   case class Shift[A](k: Token => A) extends LalrOp[A]
   case class LookAhead[A](k: Token => A) extends LalrOp[A]
@@ -21,28 +25,28 @@ object Parser {
     }
   }
 
-  def parser: Process1[Token, String \/ Ast] =
+  def parser: Process1[Token, Ast] =
     makeParser(parse)
 
-  def recv(f: Token => Process1[Token, String \/ Ast]): Process1[Token, String \/ Ast] =
-    receive1[Token, String \/ Ast](f, emit(-\/("Imcomplete parse tree")))
+  def recv(f: Token => Process1[Token, Ast]): Process1[Token, Ast] =
+    receive1[Token, Ast](f, halt.causedBy(ParseError("Imcomplete parse tree")))
 
-  def makeParser(tree: LALR[Ast]): Process1[Token, String \/ Ast] = {
-    def go(step: LALR[Ast], ahead: Option[Token]): Process1[Token, String \/ Ast] = {
-      def shifting(k: Token => LALR[Ast])(t: Token): Process1[Token, String \/ Ast] =
+  def makeParser(tree: LALR[Ast]): Process1[Token, Ast] = {
+    def go(step: LALR[Ast], ahead: Option[Token]): Process1[Token, Ast] = {
+      def shifting(k: Token => LALR[Ast])(t: Token): Process1[Token, Ast] =
         go(k(t), None)
 
-      def looking(k: Token => LALR[Ast])(t: Token): Process1[Token, String \/ Ast] =
+      def looking(k: Token => LALR[Ast])(t: Token): Process1[Token, Ast] =
         go(k(t), Some(t))
 
-      def interpret(instr: LalrOp[LALR[Ast]]): Process1[Token, String \/ Ast] = instr match {
+      def interpret(instr: LalrOp[LALR[Ast]]): Process1[Token, Ast] = instr match {
         case Shift(k)     => ahead.fold(recv(shifting(k)))(shifting(k))
         case LookAhead(k) => ahead.fold(recv(looking(k)))(looking(k))
-        case Failure(e)   => emit(-\/(e))
+        case Failure(e)   => halt.causedBy(ParseError(e))
       }
 
-      def finish(ast: Ast): Process1[Token, String \/ Ast] =
-        emit(\/-(ast))
+      def finish(ast: Ast): Process1[Token, Ast] =
+        emit(ast)
 
       step.resume.fold(interpret, finish)
     }

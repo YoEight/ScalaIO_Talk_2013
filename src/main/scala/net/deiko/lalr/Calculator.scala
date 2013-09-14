@@ -1,12 +1,10 @@
 package net.deiko.lalr
 
-import scalaz.\/
-import scalaz.concurrent.Task
 import scalaz.stream._
 import Process._
 
 object Calculator {
-  val evaluator: Process1[String \/ Ast, String \/ Double] = {
+  val evaluator: Process1[Ast, Double] = {
     def go(ast: Ast): Double =
       ast.fold[Double] {
         case Number(n) => n
@@ -16,6 +14,6 @@ object Calculator {
         case Sub(l, r) => l - r
       }
 
-    processes.lift(_.map(go))
+    processes.lift(go)
   }
 }
