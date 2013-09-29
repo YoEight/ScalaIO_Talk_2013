@@ -9,11 +9,11 @@ object Example {
     val readLnTask = for {
       _ <- Task.delay(print("""Enter expr ("quit" to exit): """))
       x <- Task.delay(readLine())
-    } yield x
+    } yield x + "\n"
 
     def go(input: String): Process[Task, Char] = input match {
-      case "quit" => halt
-      case _      => emitAll(input) ++ await[Task, String, Char](readLnTask)(go)
+      case "quit\n" => halt
+      case _        => emitAll(input) ++ await[Task, String, Char](readLnTask)(go)
     }
 
     await[Task, String, Char](readLnTask)(go)

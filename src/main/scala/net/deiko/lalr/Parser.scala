@@ -26,7 +26,7 @@ object Parser {
   }
 
   def parser: Process1[Token, Ast] =
-    makeParser(parse)
+    makeParser(parse).repeat
 
   def recv(f: Token => Process1[Token, Ast]): Process1[Token, Ast] =
     receive1[Token, Ast](f, halt.causedBy(ParseError("Imcomplete parse tree")))

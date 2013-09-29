@@ -17,6 +17,7 @@ object Lexer {
     case _ if ch.isSpaceChar => halt
     case '('                 => emit(LParens)
     case ')'                 => emit(RParens)
+    case '\n'                => emit(EOF)
     case _                   => emit(unexpected(ch))
   }
 
