@@ -5,6 +5,27 @@ import scalaz.stream._
 import Process._
 
 object Example {
+  val consoleSrc: Process[Task, Char] = {
+    val readLnTask = for {
+      _ <- Task.delay(print("""Enter expr ("quit" to exit): """))
+      x <- Task.delay(readLine())
+    } yield x
+
+    def go(input: String): Process[Task, Char] = input match {
+      case "quit" => halt
+      case _      => emitAll(input) ++ await[Task, String, Char](readLnTask)(go)
+    }
+
+    await[Task, String, Char](readLnTask)(go)
+  }
+
+  val printOut: Sink[Task, Any] = {
+    def go(input: Any) =
+      Task.now(println(input.toString))
+
+    await(Task.now[Any => Task[Unit]](go))(emit).repeat
+  }
+
   def main(args: Array[String]) {
     lazy val asyncSrc = curl("http://localhost:9000/arithmetic")
     val simpleSrc: Process[Task, Char] = emitAll("1 + 2 * 3")
@@ -12,9 +33,9 @@ object Example {
     val serialize = Formatter.formatter // |> toBytes[String]
     val exporter  = processes.fileChunkW("export.txt")
 
-    val app = simpleSrc |> compiler |> Calculator.evaluator
+    val app = consoleSrc |> compiler |> Calculator.evaluator
 
-    println(app.collect.run)
+    app.to(printOut).run.run
   }
 
   def toBytes[A](implicit A: ToBytes[A]): Process1[A, Array[Byte]] =
