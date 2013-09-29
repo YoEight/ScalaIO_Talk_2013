@@ -8,8 +8,8 @@ object Formatter {
     def go(ast: Ast): String =
       ast.fold[String] {
         case Number(n) => n.toString
-        case Mul(l, r) => s"$l * $r"
-        case Div(l, r) => s"$l / $r"
+        case Mul(l, r) => s"($l * $r)"
+        case Div(l, r) => s"($l / $r)"
         case Add(l, r) => s"($l + $r)"
         case Sub(l, r) => s"($l - $r)"
       }

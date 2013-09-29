@@ -6,15 +6,31 @@ import Process._
 
 object Example {
   def main(args: Array[String]) {
-    val source: Process[Task, Char] = emitAll("1 + 2 * (3 + 5) + 1")
-    val compile = Lexer.lexer |> Parser.parser
-    val compute = source |> compile |> Calculator.evaluator
-    val toFile  = (source |> compile |> Formatter.formatter |> toBytes[String]).to(processes.fileChunkW("export.txt"))
+    val simpleSrc: Process[Task, Char] = emitAll("1 + 2 * 3")
+    val asyncSrc  = curl("http://localhost:9000/arithmetic")
+    val compiler  = Lexer.lexer |> Parser.parser
+    val serialize = Formatter.formatter // |> toBytes[String]
+    val exporter  = processes.fileChunkW("export.txt")
 
-    println(compute.collect.run)
-    toFile.run.run
+    val app = asyncSrc |> compiler |> serialize
+
+    println(app.collect.run)
   }
 
   def toBytes[A](implicit A: ToBytes[A]): Process1[A, Array[Byte]] =
     processes.lift(A.toBytes)
+
+  def curl(location: String): Process[Task, Char] = {
+    import dispatch._, Defaults._
+    import scalaz.{-\/, \/-}
+
+    val svc    = dispatch.url(location)
+    val future = dispatch.Http(svc OK as.String)
+    val task   = Task.async[String] { k =>
+      future.onFailure { case e => k(-\/(e)) }
+      future.onSuccess { case a => k(\/-(a)) }
+    }
+
+    await[Task, String, Char](task)(str => emitAll(str))
+  }
 }
