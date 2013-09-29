@@ -6,13 +6,13 @@ import Process._
 
 object Example {
   def main(args: Array[String]) {
+    lazy val asyncSrc = curl("http://localhost:9000/arithmetic")
     val simpleSrc: Process[Task, Char] = emitAll("1 + 2 * 3")
-    val asyncSrc  = curl("http://localhost:9000/arithmetic")
     val compiler  = Lexer.lexer |> Parser.parser
     val serialize = Formatter.formatter // |> toBytes[String]
     val exporter  = processes.fileChunkW("export.txt")
 
-    val app = asyncSrc |> compiler |> serialize
+    val app = simpleSrc |> compiler |> Calculator.evaluator
 
     println(app.collect.run)
   }
