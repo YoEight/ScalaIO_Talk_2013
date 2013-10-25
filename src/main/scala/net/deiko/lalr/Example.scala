@@ -5,7 +5,7 @@ import scalaz.stream.{ Process, processes }
 import Process._
 
 object Example {
-  val consoleSrc: Process[Task, Char] = {
+  val source: Process[Task, Char] = {
     val readLnTask = for {
       _ <- Task.delay(print("""Enter expr ("quit" to exit): """))
       x <- Task.delay(readLine())
@@ -19,7 +19,7 @@ object Example {
     await[Task, String, Char](readLnTask)(go)
   }
 
-  val printOut: Sink[Task, Any] = {
+  val console: Sink[Task, Any] = {
     def go(input: Any) =
       Task.now(println(input.toString))
 
@@ -27,15 +27,15 @@ object Example {
   }
 
   def main(args: Array[String]) {
-    lazy val asyncSrc = curl("http://localhost:9000/arithmetic")
-    val simpleSrc: Process[Task, Char] = emitAll("1 + 2 * 3")
-    val compiler  = Lexer.lexer |> Parser.parser
-    val serialize = Formatter.formatter // |> toBytes[String]
-    val exporter  = processes.fileChunkW("export.txt")
+    //lazy val asyncSrc = curl("http://localhost:9000/arithmetic")
+    //val source: Process[Task, Char] = emitAll("1 + 2 * 3\n")
+    val compiler = Lexer.lexer |> Parser.parser |> Calculator.evaluator
+    //val serialize = Formatter.formatter // |> toBytes[String]
+    //val exporter  = processes.fileChunkW("export.txt")
 
-    val app = consoleSrc |> compiler |> Calculator.evaluator
+    val app = source |> compiler
 
-    app.to(printOut).run.run
+    (app to console).run.run
   }
 
   def toBytes[A](implicit A: ToBytes[A]): Process1[A, Array[Byte]] =

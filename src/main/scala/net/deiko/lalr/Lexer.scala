@@ -30,9 +30,10 @@ object Lexer {
   }
 
   def makeLit(acc: String, ch: Char): Process1[Char, Token] = ch match {
-    case _ if ch.isDigit     => receive1[Char, Token](makeLit(acc + ch, _), emit(Lit(acc + ch)) ++ emit(EOF))
-    case _ if ch.isSpaceChar => emit(Lit(acc)) ++ receive1[Char, Token](step, emit(EOF))
-    case _                   => emit(Lit(acc)) ++ step(ch)
+    case _ if ch.isDigit               => receive1[Char, Token](makeLit(acc + ch, _), emit(Lit(acc + ch)) ++ emit(EOF))
+    case _ if ch.isSpaceChar           => emit(Lit(acc)) ++ receive1[Char, Token](step, emit(EOF))
+    case _ if isOp(ch) && acc.nonEmpty => emit(Lit(acc)) ++ step(ch)
+    case _                             => emit(Lit(acc)) ++ step(ch)
   }
 
   val untermLit = Error("Unterminated numeric value")
