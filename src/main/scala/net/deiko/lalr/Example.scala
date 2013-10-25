@@ -1,7 +1,7 @@
 package net.deiko.lalr
 
 import scalaz.concurrent.Task
-import scalaz.stream._
+import scalaz.stream.{ Process, processes }
 import Process._
 
 object Example {

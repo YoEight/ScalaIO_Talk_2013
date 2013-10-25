@@ -1,6 +1,6 @@
 package net.deiko.lalr
 
-import scalaz.stream._
+import scalaz.stream.{ Process, processes }
 import Process._
 
 object Formatter {

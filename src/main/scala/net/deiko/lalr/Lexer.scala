@@ -4,7 +4,7 @@ import scalaz.concurrent.Task
 import scalaz.std.option._
 import scalaz.std.string._
 import scalaz.syntax.foldable._
-import scalaz.stream._
+import scalaz.stream.Process
 import Process._
 
 object Lexer {
