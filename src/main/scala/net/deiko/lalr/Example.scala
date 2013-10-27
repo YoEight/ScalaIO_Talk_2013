@@ -21,14 +21,14 @@ object Example {
 
   val console: Sink[Task, Any] = {
     def go(input: Any) =
-      Task.now(println(input.toString))
+      Task.delay(println(input.toString))
 
     await(Task.now[Any => Task[Unit]](go))(emit).repeat
   }
 
   def main(args: Array[String]) {
     //lazy val asyncSrc = curl("http://localhost:9000/arithmetic")
-    //val source: Process[Task, Char] = emitAll("1 + 2 * 3\n")
+    //val source: Process[Task, Char] = emitAll("1 + 2 * 3")
     val compiler = Lexer.lexer |> Parser.parser |> Calculator.evaluator
     //val serialize = Formatter.formatter // |> toBytes[String]
     //val exporter  = processes.fileChunkW("export.txt")
